@@ -127,33 +127,21 @@ app.post('/login', async (req, res) => {
       message: "Invalid data format",
     })
   }
-
-  let userDb;
-  // if emailOrUsername is email then do this
-  if(validator.isEmail(emailOrUsername)) {
-    console.log("emailOrUsername is email");
-    try {
+  try{
+    let userDb;
+    // if emailOrUsername is email then do this
+    if(validator.isEmail(emailOrUsername)) {
       userDb = await User.findOne({ email: emailOrUsername});
-      console.log(userDb);
-      if(!userDb) {
-        return res.send({
-          status: 404,
-          message: "User not found, try a valid email and username",
-        });
-      }
-    } catch(error) {
-      return res.json({
-        error: error
-      })
-    }
+    } else {
+      userDb = await User.findOne({ username: emailOrUsername});
+    } 
     if(!userDb) {
       return res.send({
-        status: 400,
-        message: "User not found, Please register first",
-      })
+        status: 404,
+        message: "User not found, try a valid email and username",
+      });
     }
 
-    // password compare with bcrypt
     const match = await bcrypt.compare(password, userDb.password);
     if(!match) {
       return res.send({
@@ -161,42 +149,22 @@ app.post('/login', async (req, res) => {
         message: "Password does not match",
       })
     }
-  } else {
-    console.log("emailOrUsername is username");
-    // if emailOrUsername is username then do this user
-    try {
-      userDb = await User.findOne({ username: emailOrUsername});
-      console.log(userDb);
-      if(!userDb) {
-        return res.send({
-          status: 404,
-          message: "User not found, try a valid email and username",
-        });
-      }
-    } catch(error) {
-      return res.json({
-        error: error
-      })
-    }
-    if(!userDb) {
-      return res.send({
-        status: 400,
-        message: "User not found, Please register first",
-      })
-    }
 
-    // password compare with bcrypt
-    const match = await bcrypt.compare(password, userDb.password);
-    if(!match) {
-      return res.send({
-        status: 400,
-        message: "Password does not match"
-      })
-    }
+    // Add session based auth sys
+
+    return res.send({
+      status: 200,
+      message: "Logged in successfully"
+    })
+
+  } catch(error) {
+    return res.send({
+      status: 500,
+      message: "database error",
+      error: error,
+    })
   }
-
-  return res.json(userDb);
-})
+});   
 
 // MVC - Models View Controler
 
