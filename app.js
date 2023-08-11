@@ -2,11 +2,14 @@ const express = require('express');
 const clc = require('cli-color');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
-const validator = require("validator");
+const validator = require('validator');
+const session = require('express-session');
+const mongoDbSession = require('connect-mongodb-session')(session);
 
 //file-imports
 const { cleanUpAndValidate } = require("./utils/AuthUtils.js");
 const User = require('./models/userSchema.js');
+const { isAuth } = require('./middleware/AuthMiddleware.js');
 
 // variables
 const app = express();
@@ -22,10 +25,20 @@ mongoose.connect(MONGO_URI).then(() => {
     console.log(clc.red.bold(err));
   });
 
+const store = new mongoDbSession({
+  uri: MONGO_URI, // mongodb databaser url
+  collection: "sessions", // collection name
+})
+
 // middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
+app.use(session({
+  secret: "This is todo app, we love coding",
+  resave: false,
+  saveUninitialized: false,
+  store: store,
+}))
 // setting the view engine
 app.set("view engine", "ejs");
 
@@ -42,8 +55,8 @@ app.get('/register', (req, res) => {
   return res.render("register");
 })
 
+// register
 app.post('/register', async (req, res) => {
-  console.log(req.body);
   const {name, email, username, password} = req.body;
   try {
     await cleanUpAndValidate(req.body);
@@ -52,7 +65,6 @@ app.post('/register', async (req, res) => {
 
     const userExistsEmail = await User.findOne({ email });
     if(userExistsEmail) {
-      console.log(userExistsEmail);
       return res.send({
         status: 403,
         message: "Email already being used."
@@ -60,7 +72,6 @@ app.post('/register', async (req, res) => {
     }
     const userExistsUsername = await User.findOne({ username });
     if(userExistsUsername) {
-      console.log(userExistsUsername);
       return res.send({
         status: 403,
         message: "Username already being used."
@@ -80,7 +91,6 @@ app.post('/register', async (req, res) => {
 
     try{
       const userDb = await user.save();
-      console.log(userDb);
       return res.send({
         status: 201,
         message: "User registerd successfully",
@@ -92,10 +102,7 @@ app.post('/register', async (req, res) => {
         message: "Database error",
         data: error
       })
-
-      console.log(error);
     }
-
     return res.send("All good");
   } catch(error) {
     return res.send({
@@ -114,7 +121,6 @@ app.post('/login', async (req, res) => {
   // password compare bcrypt.compare
   // is everything works fine, then user is login
   const { emailOrUsername, password} = req.body;
-  console.log(req.body);
   if(!emailOrUsername || !password ) {
     return res.send({
       status: 400,
@@ -151,12 +157,14 @@ app.post('/login', async (req, res) => {
     }
 
     // Add session based auth sys
+    req.session.isAuth = true;
+    req.session.user = {
+      username: userDb.username,
+      email: userDb.email,
+      userId: userDb._id,
+    }
 
-    return res.send({
-      status: 200,
-      message: "Logged in successfully"
-    })
-
+    return res.redirect('/dashboard');
   } catch(error) {
     return res.send({
       status: 500,
@@ -166,7 +174,44 @@ app.post('/login', async (req, res) => {
   }
 });   
 
-// MVC - Models View Controler
+app.get('/dashboard', isAuth, (req, res) => {
+  return res.render("dashboard");
+})
+
+// logout api
+app.post('/logout', isAuth, (req, res) => {
+  req.session.destroy((err) => {
+    if(err) throw err;
+
+    return res.redirect('/login');
+  })
+})
+
+// logout all
+app.post('/logout_from_all_devices', isAuth, async (req, res) => {
+  const username = req.session.user.username;
+  // create a session schema 
+  const sessionSchema = new mongoose.Schema({ _id: String}, { strict: false});
+  const sessionModel = mongoose.model("session", sessionSchema);
+
+  try{
+    const deletionCount = await sessionModel.deleteMany({
+      //key: values
+      "session.user.username": username,
+
+    })
+    return res.send({
+      status: 200,
+      message: "Logout from all devices successfully",
+    });
+  } catch(error) {
+    return res.send({
+      status: 500,
+      message: "Logout failed",
+      error: error,
+    })
+  }
+})
 
 app.listen(PORT, ()=> {
   console.log(clc.blue.bold("Server is running on"), clc.blue.bold.underline(`http://localhost:${PORT}`));
@@ -180,3 +225,19 @@ app.listen(PORT, ()=> {
 //
 // login page 
 // dashboard
+// logout
+// logout from all devices
+// Todos
+// create a schema for todo
+// create a todo
+// edit a todo
+// delete a todo
+
+// Broser.js
+// axios
+// read, edit and delete call from axios(client-side)
+
+
+// pagination
+// rate-limiting
+// deploy
