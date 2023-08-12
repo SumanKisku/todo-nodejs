@@ -9,6 +9,7 @@ const mongoDbSession = require('connect-mongodb-session')(session);
 //file-imports
 const { cleanUpAndValidate } = require("./utils/AuthUtils.js");
 const User = require('./models/userSchema.js');
+const Todo =require('./models/todoSchema.js')
 const { isAuth } = require('./middleware/AuthMiddleware.js');
 
 // variables
@@ -91,11 +92,7 @@ app.post('/register', async (req, res) => {
 
     try{
       const userDb = await user.save();
-      return res.send({
-        status: 201,
-        message: "User registerd successfully",
-        data: userDb
-      })
+      return res.redirect('/login');
     } catch(error) {
       return res.send({
         status: 500,
@@ -174,8 +171,24 @@ app.post('/login', async (req, res) => {
   }
 });   
 
-app.get('/dashboard', isAuth, (req, res) => {
-  return res.render("dashboard");
+app.get('/dashboard', isAuth, async (req, res) => {
+  const username = req.session.user.username;
+  try{
+    const todos = await Todo.find({ username: username });
+    return res.render("dashboard", { todos: todos});
+    // return res.send({
+    //   status: 200,
+    //   message: "Read success",
+    //   data: todos
+    // })
+  } catch(error) {
+    return res.send({
+      status: 500,
+      message: "Database error",
+      error: error,
+    })
+  }
+
 })
 
 // logout api
@@ -213,6 +226,137 @@ app.post('/logout_from_all_devices', isAuth, async (req, res) => {
   }
 })
 
+
+// todo's api
+app.post('/create-item', isAuth, async (req, res) => {
+  const todoText = req.body.todo;
+
+  // data validation
+  if(!todoText) {
+    return res.send({
+      status: 400,
+      message: "Todo item is missing",
+    })
+  }
+  if(typeof todoText !== 'string') {
+    return res.send({
+      status: 400,
+      message: "Invalid todo format",
+    })
+  }
+  if(todoText.length > 100) {
+    return res.send({
+      status: 400,
+      message: "Todo is too long, should be less than 100 char.",
+    })
+  }
+
+  // initialize todo schema and store it in dashboard
+  const todo = new Todo({
+    todo: todoText,
+    username: req.session.user.username, 
+  })
+
+  try{
+    const todoDb = await todo.save();
+
+    return res.send({
+      status: 201,
+      messae: "Todo created successfully",
+      data: todoDb,
+    })
+  } catch(error) {
+    return res.send({
+      status: 500,
+      message: "Database error",
+      error: error,
+    })
+  }
+
+  return res.send(true);
+})
+
+// todo edit-item
+app.post('/edit-item', isAuth, async (req, res) => {
+  console.log(req.body);
+  console.log
+  // data validation
+  const { newData, id } = {...req.body};
+  if(!id || !newData) {
+    return res.send({
+      status: 400,
+      message: "Missing credentials",
+    })
+  }
+  if(typeof newData !== 'string') {
+    return res.send({
+      status: 400,
+      message: "Ivalid todo format"
+    })
+  }
+  if(newData.length > 100) {
+    return res.send({
+      status: 400,
+      message: "Todo is too long, should be less than 100 char.",
+    })
+  }
+
+  try {
+    const todoDb = await Todo.findOneAndUpdate({ _id: id }, { todo: newData });
+    return res.send({
+      status: 200,
+      message: "Todo updated successfully",
+      data: todoDb,
+    })
+  } catch(error) {
+    return res.send({
+      status: 500,
+      message: "Database erro",
+      error: error,
+    })
+
+  }
+
+  return res.send(true);
+})
+app.post('/delete-item', isAuth, async (req, res) => {
+  console.log(req.body);
+  // data validation
+  const { id } = {...req.body};
+
+  if(!id) {
+    return res.send({
+      status: 400,
+      message: "Missing credentials",
+    })
+  }
+  if(typeof id !== 'string') {
+    return res.send({
+      status: 400,
+      message: "Invalid data type",
+    })
+  }
+
+  try {
+    const todoDb = await Todo.findOneAndDelete({ _id: id });
+    return res.send({
+      status: 200,
+      message: "Todo deleted successfully",
+      data: todoDb,
+    })
+  } catch(error) {
+    return res.send({
+      status: 500,
+      message: "Database error",
+      error: error,
+    })
+
+  }
+
+  return res.send(true);
+})
+
+
 app.listen(PORT, ()=> {
   console.log(clc.blue.bold("Server is running on"), clc.blue.bold.underline(`http://localhost:${PORT}`));
 })
@@ -232,6 +376,7 @@ app.listen(PORT, ()=> {
 // create a todo
 // edit a todo
 // delete a todo
+// show the todo on the dashboard page
 
 // Broser.js
 // axios
