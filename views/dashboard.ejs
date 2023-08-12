@@ -7,7 +7,7 @@
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.16/dist/tailwind.min.css" rel="stylesheet">
   <title>ToDo App</title>
 </head>
-<body class="bg-gray-100 h-screen flex justify-center items-center">
+<body class="bg-gray-100 h-screen flex justify-center">
 
   <div class="flex flex-col space-y-4">
 
@@ -21,6 +21,10 @@
         <button class="bg-blue-500 text-white rounded px-12 py-2 hover:bg-blue-600 transition">Add Item</button>
       </div>
     </form>
+
+    <ul id="item-list" class="">
+
+    </ul>
 
     <!-- Second Form: Logout -->
     <form action="logout" method="POST">
