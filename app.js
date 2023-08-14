@@ -34,6 +34,7 @@ const store = new mongoDbSession({
 // middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static("public")); // making static files available, in public folder
 app.use(session({
   secret: "This is todo app, we love coding",
   resave: false,
@@ -89,10 +90,9 @@ app.post('/register', async (req, res) => {
       password: hashPassword,
     })
 
-
     try{
       const userDb = await user.save();
-      return res.redirect('/login');
+      return res.redirect('/dashboard');
     } catch(error) {
       return res.send({
         status: 500,
@@ -100,7 +100,6 @@ app.post('/register', async (req, res) => {
         data: error
       })
     }
-    return res.send("All good");
   } catch(error) {
     return res.send({
       stauts: 400,
@@ -172,23 +171,7 @@ app.post('/login', async (req, res) => {
 });   
 
 app.get('/dashboard', isAuth, async (req, res) => {
-  const username = req.session.user.username;
-  try{
-    const todos = await Todo.find({ username: username });
-    return res.render("dashboard", { todos: todos});
-    // return res.send({
-    //   status: 200,
-    //   message: "Read success",
-    //   data: todos
-    // })
-  } catch(error) {
-    return res.send({
-      status: 500,
-      message: "Database error",
-      error: error,
-    })
-  }
-
+    return res.render("dashboard");
 })
 
 // logout api
@@ -278,8 +261,6 @@ app.post('/create-item', isAuth, async (req, res) => {
 
 // todo edit-item
 app.post('/edit-item', isAuth, async (req, res) => {
-  console.log(req.body);
-  console.log
   // data validation
   const { newData, id } = {...req.body};
   if(!id || !newData) {
@@ -320,7 +301,6 @@ app.post('/edit-item', isAuth, async (req, res) => {
   return res.send(true);
 })
 app.post('/delete-item', isAuth, async (req, res) => {
-  console.log(req.body);
   // data validation
   const { id } = {...req.body};
 
@@ -352,10 +332,36 @@ app.post('/delete-item', isAuth, async (req, res) => {
     })
 
   }
+})
+
+app.get('/read-item', async (req, res) => {
+  const username = req.session.user.username;
+
+  try {
+    const todos = await Todo.find({ username: username });
+    if(todos.length === 0) {
+      return res.send({
+        status: 200,
+        message: "Todo is empty",
+        data: todos,
+      })
+    }
+
+    return res.send({
+      status: 200,
+      message: "Read success",
+      data: todos,
+    })
+  } catch (error) {
+    return res.send({
+      status: 500,
+      message: "Database error",
+      error: error,
+    })
+  }
 
   return res.send(true);
 })
-
 
 app.listen(PORT, ()=> {
   console.log(clc.blue.bold("Server is running on"), clc.blue.bold.underline(`http://localhost:${PORT}`));
